@@ -111,9 +111,9 @@ func (manager *fileManager) shouldRotate() bool {
 		return true
 	}
 
-	// mtime diff
+	// mtime of dot-1 file should equate to last upload time
 	if *manager.UploadEverySeconds > 0 {
-		file_path := manager.filePath(0)
+		file_path := manager.filePath(1)
 		fileInfo, err := os.Lstat(file_path)
 		if err != nil {
 			logp.Info("S3 could not stat: $s\n", err)
@@ -125,7 +125,7 @@ func (manager *fileManager) shouldRotate() bool {
 		var tDiff int64
 		tDiff = tNow.Sub(tMtime).Nanoseconds() / 1000000000
 
-		//logp.Info("S3 time diff: %v seconds\n", tDiff)
+		//logp.Info("S3 time diff on %v: %v seconds", file_path, tDiff)
 
 		if tDiff >= *manager.UploadEverySeconds {
 			logp.Info("S3 rotate: mtime diff %v > %v", tDiff, *manager.UploadEverySeconds)
