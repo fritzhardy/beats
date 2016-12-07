@@ -22,14 +22,16 @@ import (
 const managerMaxFiles = 1024
 const defaultKeepFiles = 7
 const defaultUploadEveryBytes = 10 * 1024 * 1024
+const defaultUploadEverySeconds = 0
 
 type fileManager struct {
-	Path             string
-	Name             string
-	Region           string
-	Bucket           string
-	UploadEveryBytes *uint64
-	KeepFiles        *int
+	Path               string
+	Name               string
+	Region             string
+	Bucket             string
+	UploadEveryBytes   *uint64
+	UploadEverySeconds *int64
+	KeepFiles          *int
 
 	current      *os.File
 	current_size uint64
@@ -69,6 +71,10 @@ func (manager *fileManager) checkIfConfigSane() error {
 		manager.UploadEveryBytes = new(uint64)
 		*manager.UploadEveryBytes = defaultUploadEveryBytes
 	}
+	if manager.UploadEverySeconds == nil {
+		manager.UploadEverySeconds = new(int64)
+		*manager.UploadEverySeconds = defaultUploadEverySeconds
+	}
 
 	if *manager.KeepFiles < 2 || *manager.KeepFiles >= managerMaxFiles {
 		return fmt.Errorf("S3 number of files to keep should be between 2 and %d", managerMaxFiles-1)
@@ -96,11 +102,35 @@ func (manager *fileManager) writeLine(line []byte) error {
 
 func (manager *fileManager) shouldRotate() bool {
 	if manager.current == nil {
+		logp.Info("S3 rotate: current nil")
 		return true
 	}
 
 	if manager.current_size >= *manager.UploadEveryBytes {
+		logp.Info("S3 rotate: current size %v > %v", manager.current_size, *manager.UploadEveryBytes)
 		return true
+	}
+
+	// mtime diff
+	if *manager.UploadEverySeconds > 0 {
+		file_path := manager.filePath(0)
+		fileInfo, err := os.Lstat(file_path)
+		if err != nil {
+			logp.Info("S3 could not stat: $s\n", err)
+		}
+
+		tMtime := fileInfo.ModTime()
+		tNow := time.Now()
+
+		var tDiff int64
+		tDiff = tNow.Sub(tMtime).Nanoseconds() / 1000000000
+
+		//logp.Info("S3 time diff: %v seconds\n", tDiff)
+
+		if tDiff >= *manager.UploadEverySeconds {
+			logp.Info("S3 rotate: mtime diff %v > %v", tDiff, *manager.UploadEverySeconds)
+			return true
+		}
 	}
 
 	return false
@@ -154,7 +184,7 @@ func (manager *fileManager) s3KeyName() string {
 }
 
 func (manager *fileManager) s3Upload() error {
-	logp.Info("S3 upload last path set to: %v", manager.last)
+	logp.Info("S3 upload path: %v", manager.last)
 
 	file, err := os.Open(manager.last)
 	if err != nil {
@@ -199,20 +229,6 @@ func (manager *fileManager) s3Upload() error {
 
 	return nil
 }
-
-//func (manager *fileManager) timeIso8601() string {
-//	t := time.Now().UTC()
-//
-//	//t.Format("2006-01-02T15:04:05.999999-07:00")
-//
-//	tf := fmt.Sprintf("%d-%02d-%02dT%02d:%02d:%02d,%09d+00:00",
-//		t.Year(), t.Month(), t.Day(),
-//		t.Hour(), t.Minute(), t.Second(),
-//		t.Nanosecond())
-//	//fmt.Printf("%s", tf)
-//
-//	return tf
-//}
 
 func (manager *fileManager) filePath(file_no int) string {
 	if file_no == 0 {

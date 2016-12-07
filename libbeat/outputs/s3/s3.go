@@ -53,6 +53,10 @@ func (out *s3Output) init(config config) error {
 	logp.Info("S3 upload every bytes set to: %v", uploadeverybytes)
 	out.manager.UploadEveryBytes = &uploadeverybytes
 
+	uploadeveryseconds := int64(config.UploadEverySeconds)
+	logp.Info("S3 upload every seconds set to: %v", uploadeveryseconds)
+	out.manager.UploadEverySeconds = &uploadeveryseconds
+
 	keepfiles := config.NumberOfFiles
 	logp.Info("S3 number of files set to: %v", keepfiles)
 	out.manager.KeepFiles = &keepfiles

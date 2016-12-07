@@ -5,19 +5,21 @@ import (
 )
 
 type config struct {
-	Path          string `config:"path"`
-	Filename      string `config:"filename"`
-	UploadEveryKb int    `config:"upload_every_kb" validate:"min=1"`
-	NumberOfFiles int    `config:"number_of_files"`
-	Region        string `config:"region"`
-	Bucket        string `config:"bucket"`
+	Path               string `config:"path"`
+	Filename           string `config:"filename"`
+	UploadEveryKb      int    `config:"upload_every_kb" validate:"min=1"`
+	UploadEverySeconds int64  `config:"upload_every_sec"`
+	NumberOfFiles      int    `config:"number_of_files"`
+	Region             string `config:"region"`
+	Bucket             string `config:"bucket"`
 }
 
 var (
 	defaultConfig = config{
-		NumberOfFiles: 2,
-		UploadEveryKb: 10 * 1024,
-		Region:        "us-east-1",
+		NumberOfFiles:      2,
+		UploadEveryKb:      10 * 1024,
+		UploadEverySeconds: 0,
+		Region:             "us-east-1",
 	}
 )
 
