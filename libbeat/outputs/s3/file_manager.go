@@ -107,7 +107,7 @@ func (manager *fileManager) shouldRotate() bool {
 	}
 
 	if manager.current_size >= *manager.UploadEveryBytes {
-		logp.Info("S3 rotate: current size %v > %v", manager.current_size, *manager.UploadEveryBytes)
+		logp.Info("S3 rotate: current size %v >= %v", manager.current_size, *manager.UploadEveryBytes)
 		return true
 	}
 
@@ -116,7 +116,8 @@ func (manager *fileManager) shouldRotate() bool {
 		file_path := manager.filePath(1)
 		fileInfo, err := os.Lstat(file_path)
 		if err != nil {
-			logp.Info("S3 could not stat: $s\n", err)
+			logp.Info("S3 could not stat: %s", err)
+			return false
 		}
 
 		tMtime := fileInfo.ModTime()
@@ -128,7 +129,7 @@ func (manager *fileManager) shouldRotate() bool {
 		//logp.Info("S3 time diff on %v: %v seconds", file_path, tDiff)
 
 		if tDiff >= *manager.UploadEverySeconds {
-			logp.Info("S3 rotate: mtime diff %v > %v", tDiff, *manager.UploadEverySeconds)
+			logp.Info("S3 rotate: mtime diff %v >= %v", tDiff, *manager.UploadEverySeconds)
 			return true
 		}
 	}
@@ -219,15 +220,23 @@ func (manager *fileManager) s3Upload() error {
 		Key:    aws.String(key),
 	}
 
-	uploader := s3manager.NewUploader(sess)
-	result, err := uploader.Upload(params)
-	if err != nil {
-		logp.Info("S3 upload failure: %v", err)
+	duration := 1
+	for {
+		uploader := s3manager.NewUploader(sess)
+		result, err := uploader.Upload(params)
+		if err != nil {
+			logp.Info("S3 upload failure: %v", err)
+			logp.Info("S3 upload wait: %v seconds", duration)
+			time.Sleep(time.Duration(duration) * time.Second)
+			duration += duration
+			if duration > 256 {
+				duration = 300
+			}
+		} else {
+			logp.Info("S3 upload success: %v", result.Location)
+			return nil
+		}
 	}
-
-	logp.Info("S3 upload success: %v", result.Location)
-
-	return nil
 }
 
 func (manager *fileManager) filePath(file_no int) string {
